@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+# Copyright 2017, Ryan P. Kelly. All Rights Reserved.
+
+from __future__ import absolute_import
+
+import argparse
+import os
+import sys
+
+from PIL import Image
+
+from mosaicify import (
+    brightest_pixels,
+    create_mosaic,
+    darkest_pixels,
+    load_sources,
+    midtone_pixels,
+    ordered_pixels,
+    random_pixels,
+)
+
+
+DEFAULT_TILE_SIZE = 80
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("reference", help="path to reference image")
+parser.add_argument("sources", help="directory containing source images")
+parser.add_argument("output", help="path to output file")
+parser.add_argument("--filter", help="pattern to filter source files with")
+parser.add_argument(
+    "--tile-size",
+    help="how big to make each output tile",
+    type=int,
+    default=DEFAULT_TILE_SIZE,
+)
+parser.add_argument(
+    "--verbose",
+    help="print progress information",
+    action="store_true",
+)
+parser.add_argument(
+    "--color",
+    help="generate color image instead of grayscale",
+    action="store_true",
+)
+parser.add_argument(
+    "--pixel-method",
+    help="choose the method that chooses pixels",
+    choices=[
+        "random",
+        "ordered",
+        "midtone",
+        "darkest",
+        "brightest",
+    ],
+    default="random",
+)
+
+args = parser.parse_args()
+
+if not os.path.exists(args.reference):
+    sys.stderr.write("'{}' for reference image does not exist\n".format(args.reference))
+    sys.exit(2)
+
+if not os.path.exists(args.sources):
+    sys.stderr.write("'{}' for source directory does not exist\n".format(args.sources))
+    sys.exit(2)
+
+reference_image = Image.open(args.reference)
+
+if args.verbose:
+    print("loading source images")
+
+source_images = load_sources(
+    args.sources,
+    args.tile_size,
+    args.filter,
+    is_color=args.color,
+)
+
+if not source_images:
+    sys.stderr.write("no source images found\n")
+    sys.exit(2)
+
+pixelf = {
+    "random": random_pixels,
+    "ordered": ordered_pixels,
+    "midtone": midtone_pixels,
+    "darkest": darkest_pixels,
+    "brightest": brightest_pixels,
+}[args.pixel_method]
+
+pixels = pixelf(reference_image)
+
+if args.verbose:
+    print("creating output image")
+
+output_image = create_mosaic(
+    reference_image,
+    source_images,
+    pixels,
+    args.tile_size,
+)
+
+output_image.save(args.output)
