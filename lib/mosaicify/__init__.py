@@ -48,6 +48,21 @@ def average_color(img):
     return (wavg(r), wavg(g), wavg(b))
 
 
+def commonest_color(img):
+
+    counts = {}
+    for color in img.getdata():
+        if color not in counts:
+            counts[color] = 0
+        counts[color] += 1
+
+    counted = [(count, color) for color, count in counts.items()]
+    counted.sort()
+
+    _, color = counted[-1]
+    return color
+
+
 def crop_image(img):
 
     if img.width > img.height:
@@ -80,7 +95,8 @@ def crop_image(img):
     return img
 
 
-def load_sources(path, tile_size, filter, is_color=False, crop=crop_image):
+def load_sources(path, tile_size, filter, is_color=False, crop=crop_image,
+                 color_method=average_color):
 
     source_images = []
 
@@ -97,6 +113,7 @@ def load_sources(path, tile_size, filter, is_color=False, crop=crop_image):
                 tile_size,
                 is_color=is_color,
                 crop=crop,
+                color_method=color_method,
             )
 
             source_images.append(loaded)
@@ -104,7 +121,8 @@ def load_sources(path, tile_size, filter, is_color=False, crop=crop_image):
     return source_images
 
 
-def load_source(path, tile_size, is_color=True, crop=crop_image):
+def load_source(path, tile_size, is_color=True, crop=crop_image,
+                color_method=average_color):
 
     source_image = Image.open(path)
 
@@ -119,12 +137,12 @@ def load_source(path, tile_size, is_color=True, crop=crop_image):
     source_image = source_image.convert("RGB")
 
     (
-        average_r,
-        average_g,
-        average_b,
-    ) = average_color(source_image)
+        representative_r,
+        representative_g,
+        representative_b,
+    ) = color_method(source_image)
 
-    return (source_image, (average_r, average_g, average_b))
+    return (source_image, (representative_r, representative_g, representative_b))
 
 
 def ordered_pixels(reference_image):
@@ -230,19 +248,19 @@ def create_mosaic(reference_image, source_images, pixels, tile_size):
         reference_vec = numpy.array([[r, g, b]])
 
         normed_images = []
-        for image, avg_color in pool:
-            source_vec = numpy.array([avg_color])
+        for image, rep_color in pool:
+            source_vec = numpy.array([rep_color])
 
             norm = numpy.linalg.norm(reference_vec - source_vec)
-            normed_images.append((norm, image, avg_color))
+            normed_images.append((norm, image, rep_color))
 
         normed_images.sort()
         top20 = normed_images[:20]
         random.shuffle(top20)
 
-        _, selected_image, avg_color = top20[0]
+        _, selected_image, rep_color = top20[0]
 
-        pool.remove((selected_image, avg_color))
+        pool.remove((selected_image, rep_color))
 
         output_matrix[y][x] = selected_image
 

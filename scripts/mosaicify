@@ -10,7 +10,9 @@ import sys
 from PIL import Image
 
 from mosaicify import (
+    average_color,
     brightest_pixels,
+    commonest_color,
     create_mosaic,
     darkest_pixels,
     load_sources,
@@ -56,6 +58,15 @@ parser.add_argument(
     ],
     default="random",
 )
+parser.add_argument(
+    "--color-method",
+    help="choose the method that chooses representative tile color",
+    choices=[
+        "average",
+        "commonest",
+    ],
+    default="average",
+)
 
 args = parser.parse_args()
 
@@ -72,11 +83,17 @@ reference_image = Image.open(args.reference)
 if args.verbose:
     print("loading source images")
 
+colorf = {
+    "average": average_color,
+    "commonest": commonest_color,
+}[args.color_method]
+
 source_images = load_sources(
     args.sources,
     args.tile_size,
     args.filter,
     is_color=args.color,
+    color_method=colorf,
 )
 
 if not source_images:
