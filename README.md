@@ -9,6 +9,8 @@ Initially:
 Developing:
 
     vim lib/mosaicify/__init__.py
+    vim lib/mosaicify/colors.py
+    vim lib/mosaicify/pixels.py
 
 Running:
 
