@@ -10,12 +10,16 @@ import sys
 from PIL import Image
 
 from mosaicify import (
-    average_color,
-    brightest_pixels,
-    commonest_color,
     create_mosaic,
-    darkest_pixels,
     load_sources,
+)
+from mosaicify.colors import (
+    average_color,
+    commonest_color,
+)
+from mosaicify.pixels import (
+    brightest_pixels,
+    darkest_pixels,
     midtone_pixels,
     ordered_pixels,
     random_pixels,

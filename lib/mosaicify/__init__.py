@@ -1,7 +1,8 @@
 # Copyright 2017, Ryan P. Kelly. All Rights Reserved.
 
+from __future__ import absolute_import
+
 import fnmatch
-import math
 import os
 import random
 
@@ -9,61 +10,19 @@ import numpy
 import numpy.linalg
 from PIL import Image
 
+from mosaicify.colors import average_color
+
 
 __version__ = "1.0"
 
 
-def average_color(img):
-    """Return the average color of the given image.
+def crop_image(img):
+    """Crop the given image square.
 
     :param img: An image object.
-    :returns: A three-tuple representing the average color.
+    :returns: An sqaure image.
 
     """
-
-    h = img.histogram()
-
-    # split into red, green, blue
-    r = h[0:256]
-    g = h[256:512]
-    b = h[512:768]
-
-    def wavg(s):
-        """Find the weighted average of the sequence, which is a color channel.
-
-        :param s: A color channel sequence.
-        :returns: The weighted average.
-
-        """
-
-        # i is the index which is the channel value. w is the weight which is
-        # the frequency of occurence.
-        weighted = sum(i*w for i, w in enumerate(s))
-
-        # sum of all values, which is how many times they occur
-        total = sum(s)
-
-        return int(weighted / float(total))
-
-    return (wavg(r), wavg(g), wavg(b))
-
-
-def commonest_color(img):
-
-    counts = {}
-    for color in img.getdata():
-        if color not in counts:
-            counts[color] = 0
-        counts[color] += 1
-
-    counted = [(count, color) for color, count in counts.items()]
-    counted.sort()
-
-    _, color = counted[-1]
-    return color
-
-
-def crop_image(img):
 
     if img.width > img.height:
         new_width = img.height
@@ -97,6 +56,20 @@ def crop_image(img):
 
 def load_sources(path, tile_size, filter, is_color=False, crop=crop_image,
                  color_method=average_color):
+    """Load the all the source images.
+
+    :param path: The path to the directory containing the source images.
+    :param tile_size: How large each image will appear in the output.
+    :param filter: A shell-like glob expression to filter files in the given
+        `path` directory. Use `None` to disable filtering.
+    :param is_color: Whether or not to produce a color output (default: False).
+    :param crop: The function that crops the source images square (default:
+        `crop_image`).
+    :param color_method: The function that determines the representative color
+        for a source image (default: `average_color`).
+    :returns: A list of appropriately prepared source images.
+
+    """
 
     source_images = []
 
@@ -123,6 +96,18 @@ def load_sources(path, tile_size, filter, is_color=False, crop=crop_image,
 
 def load_source(path, tile_size, is_color=True, crop=crop_image,
                 color_method=average_color):
+    """Load a single source image.
+
+    :param path: The path to the image.
+    :param tile_size: How large each image will appear in the output.
+    :param is_color: Whether or not to produce a color output (default: False).
+    :param crop: The function that crops the source images square (default:
+        `crop_image`).
+    :param color_method: The function that determines the representative color
+        for a source image (default: `average_color`).
+    :returns: A list of appropriately prepared source images.
+
+    """
 
     source_image = Image.open(path)
 
@@ -145,90 +130,20 @@ def load_source(path, tile_size, is_color=True, crop=crop_image,
     return (source_image, (representative_r, representative_g, representative_b))
 
 
-def ordered_pixels(reference_image):
+def create_mosaic(reference_image, source_images, pixels, tile_size):
+    """Generate the output mosaic image.
 
-    pixels = []
-    for x in range(reference_image.width):
-        for y in range(reference_image.height):
-            pixels.append((x, y))
-
-    return pixels
-
-
-def random_pixels(reference_image):
-
-    pixels = ordered_pixels(reference_image)
-
-    random.shuffle(pixels)
-
-    return pixels
-
-
-def perceived_luminance(r, g, b):
-    """Calculate the perceived luminance of a color.
-
-    See http://alienryderflex.com/hsp.html for more information.
-
-    :param r: Red value.
-    :param g: Green value.
-    :param b: Blue value.
-    :returns: Perceived luminance.
+    :param reference_image: The image that is the source of pixels for the
+        output.
+    :param source_images: The list of images as returned by `load_sources` for
+        use as "pixels" of the output image.
+    :param pixels: The list of pixel coordinates representing the order in
+        which pixels will be processed when assembling the output mosaic.
+    :param tile_size: How large each source image will be rendered in the final
+        output.
+    :returns: An image object.
 
     """
-
-    return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
-
-
-def _pixels_with_brightness(reference_image):
-
-    pixels = ordered_pixels(reference_image)
-
-    with_brightness = []
-
-    for x, y in pixels:
-        r, g, b = reference_image.getpixel((x, y))
-
-        brightness = perceived_luminance(r, g, b)
-
-        with_brightness.append((brightness, (x, y)))
-
-    return with_brightness
-
-
-def midtone_pixels(reference_image):
-
-    with_brightness = _pixels_with_brightness(reference_image)
-
-    total_brightness = sum([b for b, _ in with_brightness])
-    average_brightness = total_brightness / len(with_brightness)
-
-    def midtone_sort(v):
-        b, _ = v
-        return abs(average_brightness - b)
-
-    with_brightness.sort(key=midtone_sort)
-
-    return [(x, y) for _, (x, y) in with_brightness]
-
-
-def darkest_pixels(reference_image):
-
-    with_brightness = _pixels_with_brightness(reference_image)
-
-    with_brightness.sort()
-
-    return [(x, y) for _, (x, y) in with_brightness]
-
-
-def brightest_pixels(reference_image):
-
-    pixels = darkest_pixels(reference_image)
-    pixels.reverse()
-
-    return pixels
-
-
-def create_mosaic(reference_image, source_images, pixels, tile_size):
 
     pool = source_images[:]
 
@@ -238,6 +153,8 @@ def create_mosaic(reference_image, source_images, pixels, tile_size):
 
     for x, y in pixels:
 
+        # pool may become depleted if the number of pixels in the reference
+        # image exceeds the number of source images
         if not pool:
             pool = source_images[:]
 
@@ -251,19 +168,28 @@ def create_mosaic(reference_image, source_images, pixels, tile_size):
         for image, rep_color in pool:
             source_vec = numpy.array([rep_color])
 
+            # norm gives us the "distance" or "length" of the vector that is
+            # the difference between the actual pixel color in the image and
+            # the representative color of the source or tile image
             norm = numpy.linalg.norm(reference_vec - source_vec)
             normed_images.append((norm, image, rep_color))
 
+        # sort to find the closest matching values
         normed_images.sort()
+
+        # but only chose randomly among the top 20, to avoid too aggressively
+        # matching some source images
         top20 = normed_images[:20]
         random.shuffle(top20)
 
         _, selected_image, rep_color = top20[0]
 
+        # remove the image from the pool, to minimize repetition
         pool.remove((selected_image, rep_color))
 
         output_matrix[y][x] = selected_image
 
+    # generate the output image, starting with a blank canvas
     output_width = tile_size * reference_image.width
     output_height = tile_size * reference_image.height
     output_image = Image.new("RGB", (output_width, output_height))
