@@ -49,7 +49,7 @@ def _norm_for_source(reference_image, source, location):
     return norm
 
 
-def create_mosaic(reference_image, source_images, tile_size, generations=100000):
+def create_mosaic(reference_image, source_images, tile_size, generations=1000000):
     """Generate the output mosaic image by randomly distributing tile images and
     then randomly swapping them if the swap improves the image.
 
@@ -137,7 +137,7 @@ def create_mosaic(reference_image, source_images, tile_size, generations=100000)
 
         x_offset = 0
 
-        for image in row:
+        for image, _ in row:
 
             paste_box = (
                 x_offset,

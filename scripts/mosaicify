@@ -24,6 +24,7 @@ from mosaicify.pixels import (
     ordered_pixels,
     random_pixels,
 )
+from mosaicify.stochastic import create_mosaic as stochastic_mosaic
 
 
 DEFAULT_TILE_SIZE = 80
@@ -59,6 +60,7 @@ parser.add_argument(
         "midtone",
         "darkest",
         "brightest",
+        "stochastic",
     ],
     default="random",
 )
@@ -104,24 +106,31 @@ if not source_images:
     sys.stderr.write("no source images found\n")
     sys.exit(2)
 
-pixelf = {
-    "random": random_pixels,
-    "ordered": ordered_pixels,
-    "midtone": midtone_pixels,
-    "darkest": darkest_pixels,
-    "brightest": brightest_pixels,
-}[args.pixel_method]
-
-pixels = pixelf(reference_image)
-
 if args.verbose:
     print("creating output image")
 
-output_image = create_mosaic(
-    reference_image,
-    source_images,
-    pixels,
-    args.tile_size,
-)
+if args.pixel_method == "stochastic":
+    output_image = stochastic_mosaic(
+        reference_image,
+        source_images,
+        args.tile_size,
+    )
+else:
+    pixelf = {
+        "random": random_pixels,
+        "ordered": ordered_pixels,
+        "midtone": midtone_pixels,
+        "darkest": darkest_pixels,
+        "brightest": brightest_pixels,
+    }[args.pixel_method]
+
+    pixels = pixelf(reference_image)
+
+    output_image = create_mosaic(
+        reference_image,
+        source_images,
+        pixels,
+        args.tile_size,
+    )
 
 output_image.save(args.output)
