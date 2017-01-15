@@ -11,6 +11,7 @@ import numpy.linalg
 from PIL import Image
 
 from mosaicify.colors import average_color
+from mosaicify.output import output_from_matrix
 
 
 __version__ = "1.0"
@@ -189,29 +190,5 @@ def create_mosaic(reference_image, source_images, pixels, tile_size):
 
         output_matrix[y][x] = selected_image
 
-    # generate the output image, starting with a blank canvas
-    output_width = tile_size * reference_image.width
-    output_height = tile_size * reference_image.height
-    output_image = Image.new("RGB", (output_width, output_height))
-
-    y_offset = 0
-    for row in output_matrix:
-
-        x_offset = 0
-
-        for image in row:
-
-            paste_box = (
-                x_offset,
-                y_offset,
-                x_offset + tile_size,
-                y_offset + tile_size,
-            )
-
-            output_image.paste(image, paste_box)
-
-            x_offset += tile_size
-
-        y_offset += tile_size
-
-    return output_image
+    # generate and return the output image
+    return output_from_matrix(reference_image, tile_size, output_matrix)

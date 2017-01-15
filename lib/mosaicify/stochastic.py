@@ -8,6 +8,8 @@ import numpy
 import numpy.linalg
 from PIL import Image
 
+from mosaicify.output import output_from_matrix
+
 
 def _random_pixel(reference_image):
     """Return a random pixel coordinate from the reference image.
@@ -47,6 +49,29 @@ def _norm_for_source(reference_image, source, location):
     norm = numpy.linalg.norm(reference_vec - source_vec)
 
     return norm
+
+
+def _simplify_matrix(output_matrix):
+
+    """Simplify the matrix format used by this module's ``create_mosaic``
+    method into the matrix expected by the output image generation function.
+
+    :param output_matrix: This module's matrix representation (each location is
+        an image, color tuple).
+    :returns: A new, simplified matrix.
+
+    """
+
+    new_matrix = []
+    for row in output_matrix:
+
+        new_row = []
+        for image, _ in row:
+            new_row.append(image)
+
+        new_matrix.append(new_row)
+
+    return new_matrix
 
 
 def create_mosaic(reference_image, source_images, tile_size, generations=1000000):
@@ -127,29 +152,8 @@ def create_mosaic(reference_image, source_images, tile_size, generations=1000000
             output_matrix[loc_1[1]][loc_1[0]] = source_2
             output_matrix[loc_2[1]][loc_2[0]] = source_1
 
-    # generate the output image, starting with a blank canvas
-    output_width = tile_size * reference_image.width
-    output_height = tile_size * reference_image.height
-    output_image = Image.new("RGB", (output_width, output_height))
+    # simplify our output matrix a little so we can generate the output
+    new_matrix = _simplify_matrix(output_matrix)
 
-    y_offset = 0
-    for row in output_matrix:
-
-        x_offset = 0
-
-        for image, _ in row:
-
-            paste_box = (
-                x_offset,
-                y_offset,
-                x_offset + tile_size,
-                y_offset + tile_size,
-            )
-
-            output_image.paste(image, paste_box)
-
-            x_offset += tile_size
-
-        y_offset += tile_size
-
-    return output_image
+    # create and return output
+    return output_from_matrix(reference_image, tile_size, new_matrix)
